@@ -1,1 +1,1 @@
-SQL Formatter GUI (EBH style) v0.6.0
+SQL Formatter GUI v0.6.1 (includes startup log in %TEMP%\sql_formatter_gui.log)
