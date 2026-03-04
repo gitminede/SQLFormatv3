@@ -1,4 +1,4 @@
-"""SQL formatter (EBH style) – v0.4.2
+"""SQL formatter (EBH style) – v0.5.0
 
 Implemented rules:
 
@@ -25,7 +25,7 @@ Implemented rules:
 4) BEGIN..END indentation
 - Indent content inside BEGIN..END blocks by 9 spaces per nesting level.
 - Preserves existing indentation inside the block (prefixes, does not replace).
-- Separator lines are kept at column 0.
+- END decreases indent before output.
 
 Dependency-free.
 """
@@ -93,17 +93,11 @@ def format_sql(text: str) -> str:
 
     text = _indent_begin_end_blocks(text)
 
-    # keep '= CASE'
     text = re.sub(r"=\s+CASE\b", "= CASE", text, flags=re.I)
 
     text = _normalize_separators(text)
 
     return text.strip() + "\n"
-
-
-# ----------------
-# separators
-# ----------------
 
 
 def _normalize_separators(text: str) -> str:
@@ -112,10 +106,6 @@ def _normalize_separators(text: str) -> str:
     text = re.sub(r"\n{3,}", "\n\n", text)
     return text
 
-
-# ----------------
-# comment protection
-# ----------------
 
 _BLOCK_RE = re.compile(r"/\*.*?\*/", re.S)
 
@@ -153,12 +143,13 @@ def _ensure_block_comments_on_own_line(text: str) -> str:
     return "\n".join(out_lines)
 
 
-# ----------------
-# BEGIN..END indentation
-# ----------------
-
-
 def _indent_begin_end_blocks(text: str, indent_unit: str = "         ") -> str:
+    """Indent content between BEGIN..END blocks (nesting aware).
+
+    This prefixes the ORIGINAL line (including its own leading spaces) by
+    `indent_unit * level`.
+    """
+
     begin_re = re.compile(r"^BEGIN\b", re.I)
     end_re = re.compile(r"^END\b", re.I)
 
@@ -173,11 +164,12 @@ def _indent_begin_end_blocks(text: str, indent_unit: str = "         ") -> str:
             out.append(raw)
             continue
 
-        # keep separator always at column 0
+        # keep separator at column 0 (even in BEGIN blocks)
         if stripped == _SEP:
             out.append(_SEP)
             continue
 
+        # decrease before END
         if end_re.match(stripped):
             level = max(level - 1, 0)
 
@@ -189,9 +181,7 @@ def _indent_begin_end_blocks(text: str, indent_unit: str = "         ") -> str:
     return "\n".join(out)
 
 
-# ----------------
-# CREATE TABLE formatting
-# ----------------
+# -------- CREATE TABLE formatting --------
 
 _CREATE_START_RE = re.compile(r"^\s*CREATE\s+TABLE\b", re.I)
 _NAME_RE = re.compile(r"^(\[[^\]]+\]|[A-Za-z_#@][\w#@\.]*)\s+(.*)$")
