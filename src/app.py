@@ -84,6 +84,7 @@ class App(tk.Tk):
         )
         if not path:
             return
+
         p = Path(path)
         dec = decode_bytes_best_effort(p.read_bytes())
         self.in_text.delete("1.0", tk.END)
@@ -104,6 +105,7 @@ class App(tk.Tk):
         )
         if not path:
             return
+
         p = Path(path)
         content = self.out_text.get("1.0", tk.END)
         p.write_text(content, encoding="utf-8")
@@ -114,12 +116,14 @@ class App(tk.Tk):
         if not src.strip():
             messagebox.showinfo(APP_TITLE, "Nincs bemeneti tartalom.")
             return
+
         try:
             res = format_sql(src)
         except Exception:
             _write_log("\n--- FORMAT ERROR ---\n" + traceback.format_exc())
             messagebox.showerror(APP_TITLE, f"Formázási hiba. Részletek: {_log_path()}")
             return
+
         self.out_text.delete("1.0", tk.END)
         self.out_text.insert("1.0", res)
         self.set_status(f"Kész (input: {len(src)} char, output: {len(res)} char)")
