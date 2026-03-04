@@ -7,7 +7,6 @@ from pathlib import Path
 from sql_formatter import format_sql
 from sql_formatter.formatter import decode_bytes_best_effort
 
-
 APP_TITLE = "SQL Formatter (EBH style)"
 
 
@@ -16,13 +15,10 @@ class App(tk.Tk):
         super().__init__()
         self.title(APP_TITLE)
         self.geometry("1200x800")
-
         self._current_path: Path | None = None
-
         self._build_ui()
 
     def _build_ui(self):
-        # Toolbar
         bar = tk.Frame(self, padx=8, pady=6)
         bar.pack(side=tk.TOP, fill=tk.X)
 
@@ -34,7 +30,6 @@ class App(tk.Tk):
         tk.Button(bar, text="Output másolás", command=self.copy_output).pack(side=tk.LEFT, padx=4)
         tk.Button(bar, text="Törlés", command=self.clear_all).pack(side=tk.LEFT, padx=12)
 
-        # Panes
         pan = tk.PanedWindow(self, sashrelief=tk.RAISED, sashwidth=6, orient=tk.HORIZONTAL)
         pan.pack(fill=tk.BOTH, expand=True)
 
@@ -43,22 +38,19 @@ class App(tk.Tk):
         pan.add(left)
         pan.add(right)
 
-        # Input
         tk.Label(left, text="Bemenet (eredeti SQL)").pack(anchor="w", padx=8, pady=(8, 0))
         self.in_text = tk.Text(left, wrap=tk.NONE, undo=True)
         self.in_text.pack(fill=tk.BOTH, expand=True, padx=8, pady=8)
 
-        # Output
         tk.Label(right, text="Kimenet (formázott SQL)").pack(anchor="w", padx=8, pady=(8, 0))
         self.out_text = tk.Text(right, wrap=tk.NONE)
         self.out_text.pack(fill=tk.BOTH, expand=True, padx=8, pady=8)
 
-        # Status bar
         self.status = tk.StringVar(value="Készen")
         sb = tk.Label(self, textvariable=self.status, anchor="w", padx=8)
         sb.pack(side=tk.BOTTOM, fill=tk.X)
 
-        # Key bindings
+        # Shortcuts
         self.bind_all("<Control-s>", lambda _e: self.save_file())
         self.bind_all("<Control-o>", lambda _e: self.load_file())
         self.bind_all("<Control-Return>", lambda _e: self.format_now())
@@ -96,9 +88,7 @@ class App(tk.Tk):
             return
 
         p = Path(path)
-        data = p.read_bytes()
-        dec = decode_bytes_best_effort(data)
-
+        dec = decode_bytes_best_effort(p.read_bytes())
         self.in_text.delete("1.0", tk.END)
         self.in_text.insert("1.0", dec.text)
         self._current_path = p
