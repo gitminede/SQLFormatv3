@@ -50,7 +50,6 @@ class App(tk.Tk):
         sb = tk.Label(self, textvariable=self.status, anchor="w", padx=8)
         sb.pack(side=tk.BOTTOM, fill=tk.X)
 
-        # Shortcuts
         self.bind_all("<Control-s>", lambda _e: self.save_file())
         self.bind_all("<Control-o>", lambda _e: self.load_file())
         self.bind_all("<Control-Return>", lambda _e: self.format_now())
@@ -89,6 +88,7 @@ class App(tk.Tk):
 
         p = Path(path)
         dec = decode_bytes_best_effort(p.read_bytes())
+
         self.in_text.delete("1.0", tk.END)
         self.in_text.insert("1.0", dec.text)
         self._current_path = p
