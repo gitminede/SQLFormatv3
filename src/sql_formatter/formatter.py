@@ -1,23 +1,31 @@
-"""SQL formatter (EBH style) – v0.3
+"""SQL formatter (EBH style) – v0.4.2
 
-Focus: CREATE TABLE formatting with strict comment preservation.
+Implemented rules:
 
-CREATE TABLE rules:
+1) Separators
+- Normalize dashed separators to exactly:
+  -------------------------------------------------------------------------------
+
+2) Comments
+- Preserve block comments (/* ... */) unchanged.
+- Preserve line comments (-- ...) unchanged.
+- Do NOT split line comments that contain block markers (e.g. --/*----).
+- If a real block comment (/* or /**) is glued to code on the same line, move it to a new line.
+
+3) CREATE TABLE
 - Comma on the left.
 - Align column names.
 - Align type column.
 - Align constraint column (NOT NULL / NULL / IDENTITY / etc.).
-- Keep trailing inline line comments ("-- ...") on the same line.
+- Keep trailing inline line comments (-- ...) on the same line.
+- Drop empty inline comments like just "--".
 - Keep comment-only lines inside CREATE TABLE exactly (e.g. "--            , ...").
-- CONSTRAINT lines are not wrapped/broken; kept as one line.
+- CONSTRAINT lines are kept as one line (no wrapping/breaking).
 
-Comments:
-- Block comments (/* ... */) preserved unchanged (content + layout).
-- Line comments (-- ...) preserved.
-- Special line comments containing block markers (e.g. "--/*----") are never split.
-
-Separators:
-- Normalize dash separators to: -------------------------------------------------------------------------------
+4) BEGIN..END indentation
+- Indent content inside BEGIN..END blocks by 9 spaces per nesting level.
+- Preserves existing indentation inside the block (prefixes, does not replace).
+- Separator lines are kept at column 0.
 
 Dependency-free.
 """
@@ -83,6 +91,9 @@ def format_sql(text: str) -> str:
 
     text = _ensure_block_comments_on_own_line(text)
 
+    text = _indent_begin_end_blocks(text)
+
+    # keep '= CASE'
     text = re.sub(r"=\s+CASE\b", "= CASE", text, flags=re.I)
 
     text = _normalize_separators(text)
@@ -140,6 +151,42 @@ def _ensure_block_comments_on_own_line(text: str) -> str:
                 continue
         out_lines.append(line)
     return "\n".join(out_lines)
+
+
+# ----------------
+# BEGIN..END indentation
+# ----------------
+
+
+def _indent_begin_end_blocks(text: str, indent_unit: str = "         ") -> str:
+    begin_re = re.compile(r"^BEGIN\b", re.I)
+    end_re = re.compile(r"^END\b", re.I)
+
+    out: list[str] = []
+    level = 0
+
+    for line in text.split("\n"):
+        raw = line.rstrip("\r")
+        stripped = raw.lstrip()
+
+        if stripped == "":
+            out.append(raw)
+            continue
+
+        # keep separator always at column 0
+        if stripped == _SEP:
+            out.append(_SEP)
+            continue
+
+        if end_re.match(stripped):
+            level = max(level - 1, 0)
+
+        out.append(indent_unit * level + raw)
+
+        if begin_re.match(stripped):
+            level += 1
+
+    return "\n".join(out)
 
 
 # ----------------
@@ -285,7 +332,6 @@ def _align_all_create_tables(text: str) -> str:
             started = False
             depth = 0
             in_str = False
-            # collect until outer parens close
             while i < len(lines):
                 stmt_lines.append(lines[i])
                 ln = lines[i]
@@ -314,6 +360,7 @@ def _align_all_create_tables(text: str) -> str:
                 i += 1
                 if started and depth == 0:
                     break
+
             out.extend(_format_create_table_stmt(stmt_lines))
             continue
 
@@ -326,7 +373,6 @@ def _align_all_create_tables(text: str) -> str:
 def _format_create_table_stmt(stmt_lines: list[str]) -> list[str]:
     head = re.sub(r"\s{2,}", " ", stmt_lines[0].strip())
 
-    # find tail after outer ')'
     flat = "\n".join(stmt_lines)
     p = flat.find("(")
     tail = ""
@@ -335,7 +381,6 @@ def _format_create_table_stmt(stmt_lines: list[str]) -> list[str]:
         if end is not None:
             tail = flat[end + 1 :].strip()
 
-    # parse body between outer parens while preserving comment-only lines
     items: list[tuple[str, str]] = []
     buf: list[str] = []
 
@@ -369,7 +414,6 @@ def _format_create_table_stmt(stmt_lines: list[str]) -> list[str]:
             items.append(("COMMENTLINE", line.rstrip()))
             continue
 
-        # scan chars for depth; stop when depth reaches 0
         j = 0
         out_chars = []
         while j < len(line):
@@ -401,9 +445,9 @@ def _format_create_table_stmt(stmt_lines: list[str]) -> list[str]:
 
     flush_buf()
 
-    # compute widths
     max_name = 0
     max_type = 0
+
     for kind, val in items:
         if kind != "ITEM":
             continue
@@ -458,7 +502,6 @@ def _format_create_table_stmt(stmt_lines: list[str]) -> list[str]:
             continue
 
         if _CONSTRAINT_START_RE.match(v):
-            # keep as one line
             v2 = _norm_type_parens(re.sub(r"\s{2,}", " ", v)).strip()
             prefix = " " * name_ind if first else (" " * comma_ind + ", ")
             out.append((prefix + v2).rstrip())
@@ -466,7 +509,6 @@ def _format_create_table_stmt(stmt_lines: list[str]) -> list[str]:
             continue
 
         core, cmt = _split_inline_line_comment(v)
-        # don't keep empty "--"
         if cmt is not None and cmt.strip() == "--":
             cmt = None
 
