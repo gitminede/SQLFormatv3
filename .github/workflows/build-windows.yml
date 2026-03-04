@@ -22,12 +22,18 @@ jobs:
           pip install -e .
           pip install -r requirements-dev.txt
 
-      - name: Build EXE (PyInstaller)
+      - name: Build EXE (windowed)
         run: |
           pyinstaller --noconfirm --clean --onefile --windowed --name sql-formatter-gui src/app.py
 
-      - name: Upload artifact
+      - name: Build EXE (console debug)
+        run: |
+          pyinstaller --noconfirm --clean --onefile --console --name sql-formatter-gui-console src/app.py
+
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: sql-formatter-gui-windows
-          path: dist/sql-formatter-gui.exe
+          path: |
+            dist/sql-formatter-gui.exe
+            dist/sql-formatter-gui-console.exe
